@@ -69,6 +69,15 @@ label.f{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:1
 .drivers{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow:auto}
 .drv{background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:0 2px 8px rgba(80,50,10,.06);cursor:pointer;border:2px solid transparent}
 .drv:hover{border-color:var(--accent)}
+.swatch{width:14px;height:14px;border-radius:4px;display:inline-block;flex:none}
+.nextline{margin-top:6px;padding:6px 10px;border-left:4px solid;border-radius:6px;background:var(--soft);font-size:13px}
+.nextpin{width:30px;height:40px;position:relative}
+.nextpin::before{content:"";position:absolute;left:3px;top:0;width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--c);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.nextpin span{position:absolute;left:0;top:3px;width:30px;text-align:center;color:#fff;font-weight:800;font-size:12px}
+.pinbox{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:6px 12px;box-shadow:0 2px 8px rgba(80,50,10,.06)}
+.pinbox b{font-family:ui-monospace,monospace;font-size:20px;letter-spacing:3px}
+.searchbox{position:relative}.searchbox input{width:240px;padding:8px 12px}
+tr.hl td{background:var(--warn-bg)!important}
 .drv .nm{font-weight:700}
 .bar{height:8px;background:var(--soft);border-radius:99px;overflow:hidden;margin:8px 0 4px}.bar i{display:block;height:100%;background:var(--ok);border-radius:99px}
 table{width:100%;border-collapse:collapse;font-size:14px}
@@ -196,12 +205,13 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--soft)}
       <button data-tab="settings" data-admin>Settings</button>
       <button data-tab="activity" data-admin>Activity</button>
     </nav>
+    <div class="searchbox"><input id="qBox" class="in" type="search" placeholder="Find a parcel – ref, name, address…" autocomplete="off"></div>
     <div class="who"><div class="av" id="meAv">?</div><div><b id="meName" style="color:var(--ink)"></b><div id="meRole"></div></div>
       <button class="btn small ghost" id="outBtn">Sign out</button></div>
   </div></header>
   <main>
     <section id="t-live">
-      <div class="h2row"><h2>Live</h2><span class="sub" id="liveAt"></span><span class="sp"></span><button class="btn small ghost" id="liveFit">Show all drivers</button></div>
+      <div class="h2row"><h2>Live</h2><span class="sub" id="liveAt"></span><span class="sp"></span><div class="pinbox hidden" id="pinBox"><span class="sub">Supervisor override PIN</span><b id="pinNow">––––</b><span class="sub">new PIN after each use</span></div><button class="btn small ghost" id="liveFit">Show all drivers</button></div>
       <div class="grid g2"><div id="map"></div><div class="drivers" id="drvList"></div></div>
     </section>
     <section id="t-days" class="hidden">
@@ -337,7 +347,7 @@ async function loadPeople() {
 /* ---------- live map ---------- */
 let map, liveLayer, liveFirst = true;
 const COLORS = ['#2f9b5f', '#3b7dd8', '#c0661a', '#8e44ad', '#c0362c', '#16a085', '#d35400', '#2c3e50'];
-const colorFor = (id) => { const i = PEOPLE.filter((p) => p.role === 'driver').findIndex((p) => p.user_id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+const colorFor = (id) => { const p = person(id); if (p && p.color) return p.color; const i = PEOPLE.filter((x) => x.role === 'driver').findIndex((x) => x.user_id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
 function tiles(m) { L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(m); }
 async function loadLive() {
   if (!map) { map = L.map('map').setView([-33.96, 25.6], 11); tiles(map); liveLayer = L.layerGroup().addTo(map); }
@@ -350,23 +360,34 @@ async function loadLive() {
     if (r.lat == null) continue;
     const p = person(r.driver_id), stale = Date.now() - new Date(r.at) > 15 * 60000;
     const ic = L.divIcon({ className: '', html: `<div class="mk ${stale ? 'stale' : ''}" style="background:${colorFor(r.driver_id)}">${esc(initials(p.name))}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
-    L.marker([r.lat, r.lng], { icon: ic }).addTo(liveLayer).bindPopup(`<b>${esc(p.name)}</b><br>${esc((PHASE[r.phase] || [r.phase])[0] || '')} · ${r.delivered ?? 0}/${r.total ?? 0} delivered<br><span class="sub">${ago(r.at)}</span>`);
+    const col = colorFor(r.driver_id);
+    L.marker([r.lat, r.lng], { icon: ic, zIndexOffset: 500 }).addTo(liveLayer).bindPopup(`<b>${esc(p.name)}</b><br>${esc((PHASE[r.phase] || [r.phase])[0] || '')} · ${r.delivered ?? 0}/${r.total ?? 0} delivered<br><span class="sub">${ago(r.at)}</span>`);
     pts.push([r.lat, r.lng]);
+    if (r.phase === 'running' && r.next_lat != null && !stale) {
+      L.polyline([[r.lat, r.lng], [r.next_lat, r.next_lng]], { color: col, weight: 3, dashArray: '6 8', opacity: .9 }).addTo(liveLayer);
+      const nIc = L.divIcon({ className: '', html: `<div class="nextpin" style="--c:${col}"><span>${esc((r.next_stop || '').match(/^#(\d+)/) ? r.next_stop.match(/^#(\d+)/)[1] : '•')}</span></div>`, iconSize: [30, 40], iconAnchor: [15, 38] });
+      L.marker([r.next_lat, r.next_lng], { icon: nIc }).addTo(liveLayer)
+        .bindPopup(`<b>Next for ${esc(p.name)}</b><br>${esc(r.next_stop || '')}<br>${esc(r.next_address || '')}<br>${r.next_eta ? '<b>ETA ' + fmtT(r.next_eta) + '</b>' : ''}`);
+      pts.push([r.next_lat, r.next_lng]);
+    }
   }
   if (pts.length && liveFirst) { map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 }); liveFirst = false; }
   $('#liveFit').onclick = () => pts.length && map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
   $('#liveAt').textContent = 'Updated ' + fmtT(Date.now()) + ' · refreshes every 20 s';
+  const { data: co } = await sb.from('companies').select('safety').eq('id', ME.company_id).maybeSingle();
+  const curPin = co && co.safety && co.safety.overridePin;
+  $('#pinBox').classList.toggle('hidden', !curPin); $('#pinNow').textContent = curPin || '';
   const drivers = PEOPLE.filter((p) => p.role === 'driver' && p.active);
   $('#drvList').innerHTML = drivers.map((p) => {
     const r = rows.find((x) => x.driver_id === p.user_id), ph = r && PHASE[r.phase];
     const today = r && isoDate(new Date(r.at)) === isoDate(new Date());
     const pct = r && r.total ? Math.round(100 * (r.delivered || 0) / r.total) : 0;
     return `<div class="drv" data-drv="${p.user_id}" data-day="${r && r.day_id ? esc(r.day_id) : ''}">
-      <div class="row"><span class="dot" style="color:${colorFor(p.user_id)}"></span><span class="nm">${esc(p.name)}</span><span class="sp"></span>
+      <div class="row"><span class="swatch" style="background:${colorFor(p.user_id)}"></span><span class="nm">${esc(p.name)}</span><span class="sp"></span>
       ${r && today && ph ? `<span class="pill ${ph[1]}">${ph[0]}</span>` : '<span class="pill">Not active today</span>'}</div>
       ${r && today ? `<div class="bar"><i style="width:${pct}%"></i></div>
       <div class="row sub"><span>${r.delivered || 0} of ${r.total || 0} delivered</span><span class="sp"></span>${r.back_at && r.phase !== 'done' ? `<span>back ~${fmtT(r.back_at)}</span>` : ''}</div>
-      ${r.next_stop && r.phase === 'running' ? `<div class="sub">Next: ${esc(r.next_stop)}</div>` : ''}` : ''}
+      ${r.next_stop && r.phase === 'running' ? `<div class="nextline" style="border-color:${colorFor(p.user_id)}"><b>Next: ${esc(r.next_stop)}</b>${r.next_eta ? ` · ETA <b>${fmtT(r.next_eta)}</b>` : ''}${r.next_address ? `<br><span class="sub">${esc(r.next_address)}</span>` : ''}</div>` : ''}` : ''}
       <div class="sub">${r ? 'Last seen ' + ago(r.at) : 'Never signed in'}</div></div>`;
   }).join('') || '<div class="card empty">No drivers yet. Add them under People.</div>';
   document.querySelectorAll('.drv').forEach((el) => (el.onclick = () => {
@@ -375,6 +396,25 @@ async function loadLive() {
   }));
 }
 const initials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+/* ---------- parcel search ---------- */
+$('#qBox').addEventListener('keydown', (e) => { if (e.key === 'Enter') findParcels($('#qBox').value); });
+async function findParcels(q) {
+  q = (q || '').trim(); if (q.length < 2) { toast('Type at least 2 characters', true); return; }
+  const { data, error } = await sb.rpc('find_parcels', { p_q: q.replace(/[%_]/g, '') });
+  if (error) { toast(error.message, true); return; }
+  const rows = data || [];
+  modal(`<div class="h2row"><h2>Parcels matching “${esc(q)}”</h2><span class="sp"></span><button class="btn small ghost" data-close>Close</button></div>
+    <div class="tbl"><table><thead><tr><th>Parcel</th><th>Recipient / address</th><th>Driver</th><th>Date</th><th>Status</th><th>Time</th></tr></thead><tbody>
+    ${rows.map((r, i) => { const p = r.parcel, D = p.done, drv = person(r.driver_id) || { name: '?' };
+      const st = !D ? (r.phase === 'running' ? '<span class="pill warn">On the way</span>' : r.phase === 'done' ? '<span class="pill bad">Not delivered</span>' : '<span class="pill">Loaded</span>')
+        : D.kind === 'delivered' ? '<span class="pill ok">Delivered</span>' : D.kind === 'failed' ? '<span class="pill bad">Failed</span>' : '<span class="pill warn">Returned</span>';
+      const tm = D ? fmtT(D.at) : p.eta ? `ETA <b>${fmtT(p.eta)}</b>` : '–';
+      return `<tr class="click" data-i="${i}"><td><b>${esc(p.ref || p.code || '')}</b></td><td>${esc(p.name || '')}${p.phone ? ' · ' + esc(p.phone) : ''}<br><span class="sub">${esc(p.address || '')}</span></td>
+        <td><span class="swatch" style="background:${colorFor(r.driver_id)}"></span> ${esc(drv.name)}</td><td>${esc(fmtD(r.day + 'T12:00'))}</td><td>${st}</td><td>${tm}</td></tr>`; }).join('')
+      || '<tr><td colspan="6" class="empty">Nothing found in the last 90 days.</td></tr>'}</tbody></table></div>`, true);
+  document.querySelectorAll('#modalCard tr[data-i]').forEach((tr) => (tr.onclick = () => { const r = rows[+tr.dataset.i]; openDay(r.day_id, r.parcel.id); }));
+}
 
 /* ---------- days ---------- */
 $('#fGo').onclick = loadDays;
@@ -400,7 +440,7 @@ async function loadDays() {
 
 /* ---------- one day in detail ---------- */
 let dayMap = null;
-async function openDay(id) {
+async function openDay(id, focusId) {
   const [{ data: d, error }, { data: tr }] = await Promise.all([
     sb.from('days').select('*').eq('id', id).maybeSingle(),
     sb.from('tracks').select('seq,points').eq('day_id', id).order('seq')]);
@@ -426,7 +466,7 @@ async function openDay(id) {
     ${list.map((p) => { const D = p.done; const res = !D ? '<span class="pill">Not delivered</span>' : D.kind === 'delivered' ? '<span class="pill ok">Delivered</span>' : D.kind === 'failed' ? `<span class="pill bad">Failed</span> <span class="sub">${esc(D.reason || '')}</span>` : `<span class="pill warn">Returned</span> <span class="sub">${esc(D.reason || '')}</span>`;
       const chk = D && D.kind === 'delivered' ? (D.check === 'override' ? `<span class="pill bad">OVERRIDE</span> <span class="sub">${esc(D.override || '')}${D.distAddr != null ? ' · ' + D.distAddr + ' m away' : ''}</span>` : D.check === 'ok' ? `<span class="pill ok">OK</span> <span class="sub">${D.distAddr != null ? D.distAddr + ' m' : ''}</span>` : `<span class="sub">${esc(D.check || '')}</span>`) : '';
       const up = D && D.pod && D.pod.up || {};
-      return `<tr><td>${p.seq || ''}</td><td><b>${esc(p.ref || '')}</b>${D && D.typed ? '<br><span class="sub">typed in</span>' : ''}</td><td>${esc(p.name || '')}${p.phone ? ' · ' + esc(p.phone) : ''}<br><span class="sub">${esc(p.address || '')}</span></td>
+      return `<tr data-pid="${esc(p.id)}" class="${p.id === focusId ? 'hl' : ''}"><td>${p.seq || ''}</td><td><b>${esc(p.ref || '')}</b>${D && D.typed ? '<br><span class="sub">typed in</span>' : ''}</td><td>${esc(p.name || '')}${p.phone ? ' · ' + esc(p.phone) : ''}<br><span class="sub">${esc(p.address || '')}</span></td>
         <td>${res}</td><td>${D ? fmtT(D.at) : p.eta ? '<span class="sub">ETA ' + fmtT(p.eta) + '</span>' : ''}</td><td>${chk}</td><td>${esc(D && D.receivedBy || '')}</td>
         <td><div class="thumbs">${up.photo && typeof up.photo === 'string' ? `<img data-path="${esc(up.photo)}" alt="Photo">` : ''}${up.sig && typeof up.sig === 'string' ? `<img data-path="${esc(up.sig)}" alt="Signature" style="background:#fff">` : ''}${D && D.pod && (D.pod.photo || D.pod.sig) && !up.photo && !up.sig ? '<span class="sub">uploading…</span>' : ''}</div></td></tr>`; }).join('')}
     </tbody></table></div>`, true);
@@ -438,18 +478,21 @@ async function openDay(id) {
   }
   // map: driven track + stops
   if (dayMap) { dayMap.remove(); dayMap = null; }
-  dayMap = L.map('dayMap'); tiles(dayMap); const b = [];
+  dayMap = L.map('dayMap'); tiles(dayMap); const b = []; let focusMk = null;
   if (track.length) { const ll = track.map((t) => [t[0], t[1]]); L.polyline(ll, { color: '#3b7dd8', weight: 4, opacity: .85 }).addTo(dayMap); b.push(...ll); }
   const base = d.data.base; if (base) { L.marker([base.lat, base.lng], { icon: L.divIcon({ className: '', html: '<div class="stop" style="background:#222">S</div>', iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(dayMap).bindPopup('Start / return: ' + esc(base.label || '')); b.push([base.lat, base.lng]); }
   for (const p of list) {
     const D = p.done; const at = D && D.lat != null ? [D.lat, D.lng] : p.lat != null ? [p.lat, p.lng] : null; if (!at) continue;
     const cls = !D ? '' : D.kind === 'delivered' ? (D.check === 'override' ? 'warn' : 'ok') : 'bad';
-    L.marker(at, { icon: L.divIcon({ className: '', html: `<div class="stop ${cls}">${p.seq || '•'}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(dayMap)
-      .bindPopup(`<b>${esc(p.ref || '')}</b> ${esc(p.name || '')}<br>${esc(p.address || '')}<br>${D ? esc(D.kind) + ' ' + fmtT(D.at) : 'not delivered'}`);
+    const when = D ? `<b>${esc(D.kind === 'cancelled' ? 'returned' : D.kind)} at ${fmtT(D.at)}</b>${p.eta ? ` <span class="sub">(ETA was ${fmtT(p.eta)})</span>` : ''}`
+      : p.eta ? `<b>ETA ${fmtT(p.eta)}</b>` : 'not delivered';
+    const mk = L.marker(at, { icon: L.divIcon({ className: '', html: `<div class="stop ${cls}" style="${p.id === focusId ? 'outline:3px solid #FBAB57;outline-offset:2px' : ''}">${p.seq || '•'}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(dayMap)
+      .bindPopup(`<b>${p.seq ? '#' + p.seq + ' ' : ''}${esc(p.ref || '')}</b> ${esc(p.name || '')}<br>${esc(p.address || '')}<br>${when}`);
+    if (p.id === focusId) focusMk = mk;
     b.push(at);
   }
   if (b.length) dayMap.fitBounds(b, { padding: [30, 30], maxZoom: 15 }); else dayMap.setView([-33.96, 25.6], 11);
-  setTimeout(() => dayMap.invalidateSize(), 80);
+  setTimeout(() => { dayMap.invalidateSize(); if (focusMk) { focusMk.openPopup(); const row = document.querySelector('#modalCard tr.hl'); if (row) row.scrollIntoView({ block: 'center' }); } }, 120);
   $('#dCsv').onclick = () => download(`route-runner_${d.day}_${(drv.name || 'driver').replace(/\W+/g, '-')}.csv`, dayCsv(d, list), 'text/csv');
   $('#dGpx').onclick = () => download(`route-runner_${d.day}_${(drv.name || 'driver').replace(/\W+/g, '-')}.gpx`, gpx(d, track, list), 'application/gpx+xml');
 }
@@ -492,7 +535,7 @@ async function renderPeople() {
   const { data: live } = await sb.from('live').select('driver_id,at');
   $('#pplTbl').innerHTML = `<thead><tr><th>Name</th><th>Role</th><th>Signs in with</th><th>Phone</th><th>Last seen on phone</th><th>Status</th><th></th></tr></thead><tbody>` +
     PEOPLE.map((p) => { const l = (live || []).find((x) => x.driver_id === p.user_id); return `<tr>
-      <td><b>${esc(p.name)}</b>${p.user_id === ME.user_id ? ' <span class="sub">(you)</span>' : ''}</td><td>${ROLE[p.role]}</td>
+      <td>${p.role === 'driver' ? `<span class="swatch" style="background:${colorFor(p.user_id)}"></span> ` : ''}<b>${esc(p.name)}</b>${p.user_id === ME.user_id ? ' <span class="sub">(you)</span>' : ''}</td><td>${ROLE[p.role]}</td>
       <td>${p.role === 'driver' ? `<span class="pill ink">${esc(ME.code)}</span> · <b>${esc(p.username)}</b> · PIN` : esc(p.email || '')}</td><td>${esc(p.phone || '')}</td>
       <td class="sub">${l ? ago(l.at) : p.role === 'driver' ? 'never' : ''}</td>
       <td>${p.active ? '<span class="pill ok">Active</span>' : '<span class="pill bad">Switched off</span>'}</td>
@@ -564,6 +607,7 @@ function editPerson(p) {
   modal(`<h2>Edit ${esc(p.name)}</h2>
     <label class="f" for="eName">Full name</label><input id="eName" class="in" value="${esc(p.name)}">
     <label class="f" for="ePhone">Cell number</label><input id="ePhone" class="in" value="${esc(p.phone || '')}">
+    ${p.role === 'driver' ? `<label class="f" for="eColor">Colour on the live map</label><input id="eColor" type="color" value="${esc(p.color || colorFor(p.user_id))}" style="width:70px;height:40px;border:0;background:none">` : ''}
     <label class="f" for="eRole">Role</label><select id="eRole" class="in">${roles.map((r) => `<option value="${r}" ${r === p.role ? 'selected' : ''}>${ROLE[r]}</option>`).join('')}</select>
     ${p.user_id === ME.user_id ? '' : `<label class="switch"><span>Active – can sign in<br><span class="sub">Switch off when someone leaves or loses their phone. Their records stay.</span></span><input type="checkbox" id="eAct" ${p.active ? 'checked' : ''}></label>`}
     <div class="err" id="eErr"></div>
@@ -571,6 +615,7 @@ function editPerson(p) {
   $('#eGo').onclick = async () => {
     const r = await sb.rpc('update_member', { p_user: p.user_id, p_name: $('#eName').value.trim() || p.name, p_role: $('#eRole').value, p_active: $('#eAct') ? $('#eAct').checked : true, p_phone: $('#ePhone').value.trim() || null });
     if (r.error) { $('#eErr').textContent = r.error.message; return; }
+    if ($('#eColor') && $('#eColor').value !== p.color) { const c = await sb.rpc('set_member_color', { p_user: p.user_id, p_color: $('#eColor').value }); if (c.error) { $('#eErr').textContent = c.error.message; return; } }
     closeModal(); toast('Saved'); renderPeople();
   };
 }
