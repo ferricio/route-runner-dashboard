@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Route Runner Dashboard</title>
+<link rel="icon" href="favicon.png">
+<link rel="stylesheet" href="lib/leaflet.css">
+<style>
+@font-face{font-family:"Poppins";font-weight:400;font-display:swap;src:url(fonts/poppins-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Poppins";font-weight:500;font-display:swap;src:url(fonts/poppins-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Poppins";font-weight:600;font-display:swap;src:url(fonts/poppins-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Poppins";font-weight:700;font-display:swap;src:url(fonts/poppins-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Poppins";font-weight:800;font-display:swap;src:url(fonts/poppins-latin-800-normal.woff2) format("woff2")}
+:root{
+  --bg:#FFF3E2; --card:#ffffff; --ink:#222222; --muted:#7d6c59; --line:#f2dfc4; --soft:#fbecd6;
+  --accent:#FBAB57; --accent-2:#f39a3c; --gold-text:#c0661a; --sun:#FEC674;
+  --ok:#2f9b5f; --ok-bg:#e3f4e8; --warn:#a85a10; --warn-bg:#ffedd2; --bad:#c0362c; --bad-bg:#fde6e3;
+  --display:"Poppins",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --r:16px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#222222; --card:#2d2d2d; --ink:#FFF3E2; --muted:#bba98f; --line:#3b3b3b; --soft:#363636;
+  --gold-text:#FEC674; --ok:#5cc98a; --ok-bg:#1f3a2a; --warn:#FEC674; --warn-bg:#40331f; --bad:#ff8a7e; --bad-bg:#432421; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#222222; --card:#2d2d2d; --ink:#FFF3E2; --muted:#bba98f; --line:#3b3b3b; --soft:#363636;
+  --gold-text:#FEC674; --ok:#5cc98a; --ok-bg:#1f3a2a; --warn:#FEC674; --warn-bg:#40331f; --bad:#ff8a7e; --bad-bg:#432421; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--display)}
+h1,h2,h3{font-family:var(--display);margin:0}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--gold-text)}
+.hidden{display:none!important}
+.logo{width:42px;height:42px;border-radius:12px;flex:none;box-shadow:0 3px 10px rgba(0,0,0,.12)}
+.top{position:sticky;top:0;z-index:1000;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-in{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand b{font-weight:800;font-size:19px;letter-spacing:-.3px}.brand b em{font-style:normal;color:var(--accent)}
+.brand small{display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+.tabs button{border:0;background:none;padding:8px 14px;border-radius:99px;font-weight:600;color:var(--muted);cursor:pointer}
+.tabs button.on{background:var(--ink);color:var(--bg)}
+.tabs button:hover:not(.on){background:var(--soft)}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#222;display:grid;place-items:center;font-weight:800;flex:none}
+main{max-width:1280px;margin:0 auto;padding:18px 16px 60px}
+.card{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:0 2px 10px rgba(80,50,10,.06)}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:minmax(0,1fr) 380px}
+@media (max-width:900px){.g2{grid-template-columns:1fr}}
+.btn{border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer;background:var(--soft);display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn.primary{background:var(--ink);color:var(--bg)}.btn.accent{background:linear-gradient(135deg,var(--accent-2),var(--sun));color:#222}
+.btn.ghost{background:none;border:1px solid var(--line)}.btn.danger{background:var(--bad-bg);color:var(--bad)}
+.btn.small{padding:6px 12px;font-size:13px;border-radius:10px}
+.btn:disabled{opacity:.5;cursor:default}
+.in{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;outline:none}
+.in:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(251,171,87,.25)}
+label.f{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
+.sub{color:var(--muted);font-size:13px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--soft);white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.ink{background:var(--ink);color:var(--bg)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+#map,#dayMap{height:560px;border-radius:var(--r);overflow:hidden;background:var(--soft)}
+#dayMap{height:420px}
+.leaflet-container{font:inherit}
+.drivers{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow:auto}
+.drv{background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:0 2px 8px rgba(80,50,10,.06);cursor:pointer;border:2px solid transparent}
+.drv:hover{border-color:var(--accent)}
+.drv .nm{font-weight:700}
+.bar{height:8px;background:var(--soft);border-radius:99px;overflow:hidden;margin:8px 0 4px}.bar i{display:block;height:100%;background:var(--ok);border-radius:99px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--soft)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl{overflow:auto}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0}
+.tile{background:var(--soft);border-radius:14px;padding:10px 12px}.tile b{display:block;font-size:22px;font-weight:800}.tile span{font-size:12px;color:var(--muted);font-weight:600}
+.thumbs{display:flex;gap:6px}.thumbs img{width:54px;height:54px;object-fit:cover;border-radius:8px;cursor:zoom-in;background:var(--soft)}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+.modal{position:fixed;inset:0;background:rgba(10,10,10,.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal .card{width:100%;max-width:460px;max-height:92vh;overflow:auto}
+.modal .card.wide{max-width:1100px}
+.modal img.big{max-width:100%;max-height:80vh;display:block;margin:auto;border-radius:12px}
+.secret{font-family:ui-monospace,monospace;font-size:26px;font-weight:800;letter-spacing:3px;text-align:center;padding:14px;margin:10px 0;border:2px dashed var(--accent);border-radius:12px;background:var(--bg)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f3a2a;color:#fff;padding:12px 18px;border-radius:12px;z-index:3000;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.toast.bad{background:#5a1d18}
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+#login .card{width:100%;max-width:400px;padding:28px 24px}
+#login .logo{width:72px;height:72px;margin:0 auto;display:block;border-radius:20px}
+#login h1{text-align:center;font-weight:800;font-size:26px;margin-top:10px}#login h1 em{font-style:normal;color:var(--accent)}
+.err{color:var(--bad);font-weight:600;font-size:14px;min-height:20px;margin-top:10px}
+.switch{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0}
+.switch input{width:20px;height:20px;accent-color:var(--accent-2)}
+.h2row{display:flex;align-items:center;gap:12px;margin:0 0 12px;flex-wrap:wrap}
+.h2row h2{font-size:20px;font-weight:800}
+.mk{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);color:#fff}
+.mk.stale{filter:grayscale(.8);opacity:.75}
+.stop{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:11px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);color:#fff;background:#222}
+.stop.ok{background:#2f9b5f}.stop.bad{background:#c0362c}.stop.warn{background:#f39a3c}
+</style>
+</head>
+<body>
+<div id="login" class="hidden">
+  <div class="card">
+    <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
+  <defs><clipPath id="rrc"><rect width="100" height="100" rx="22"/></clipPath></defs>
+  <g clip-path="url(#rrc)"><rect width="100" height="100" fill="#eef0f3"/><g transform="translate(0.0 0.0) scale(1.0)">
+  <rect width="100" height="100" fill="#eef0f3"/>
+  <path d="M60 52 L72 51 L73 61 L61 63Z" fill="#c6e8cc"/>
+  <path d="M2 50 L14 50 L14 61 L2 61Z" fill="#c6e8cc"/>
+  <path d="M33 83 L47 82 L48 91 L34 91Z" fill="#c6e8cc"/>
+  <path d="M44 2 L52 2 L52 10 L44 10Z" fill="#d6efd9"/>
+  <path d="M88 0 H100 V44 C95 40 93 33 92 25 C91 16 90 8 88 0Z" fill="#aad3f5"/>
+  <path d="M0 71 C10 68 18 74 26 71 S40 66 48 70 S60 74 66 71" fill="none" stroke="#a6d4f2" stroke-width="1.3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="
+  M0 12 H100 M0 63 H100 M0 90 H100
+  M8 0 V100 M90 0 V100 M38 0 V31 M72 0 V31 M44 73 V100 M66 73 V100 M30 90 V100" stroke="#dde1e6" stroke-width="2.6"/>
+    <path d="
+  M0 12 H100 M0 63 H100 M0 90 H100
+  M8 0 V100 M90 0 V100 M38 0 V31 M72 0 V31 M44 73 V100 M66 73 V100 M30 90 V100" stroke="#ffffff" stroke-width="1.6"/>
+    <path d="M0 34 H100 M0 70 H100 M18 0 V100 M52 0 V100 M29 34 A9.25 9.25 0 0 1 29 52.5 M63 34 A9.25 9.25 0 0 1 63 52.5 M0 52.5 H18 M29 52.5 H52 M63 52.5 H100 M29 52.5 L39 70 L56.14285714285714 100 M63 52.5 L73 70 L90.14285714285714 100" stroke="#dde1e6" stroke-width="4"/>
+    <path d="M0 34 H100 M0 70 H100 M18 0 V100 M52 0 V100 M29 34 A9.25 9.25 0 0 1 29 52.5 M63 34 A9.25 9.25 0 0 1 63 52.5 M0 52.5 H18 M29 52.5 H52 M63 52.5 H100 M29 52.5 L39 70 L56.14285714285714 100 M63 52.5 L73 70 L90.14285714285714 100" stroke="#ffffff" stroke-width="3"/>
+    <path d="M0 36 L46 6 L100 2" stroke="#b8c6d8" stroke-width="3.4"/>
+    <path d="M0 36 L46 6 L100 2" stroke="#d2dcea" stroke-width="2"/>
+  </g>
+  <circle cx="81" cy="56" r="1.9" fill="#e8584a"/><path d="M80.2 55.2v1.6m1.6-1.6v1.6m-1.6-.8h1.6" stroke="#fff" stroke-width=".45"/>
+  <circle cx="9" cy="86" r="1.7" fill="#3b8de0"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 70 L18.00 39.50 Q18.00 34.00 23.50 34.00 L29 34 A9.25 9.25 0 0 1 29 52.5 L36.27 65.22 Q39.00 70.00 44.50 70.00 L46.50 70.00 Q52.00 70.00 52.00 64.50 L52.00 39.50 Q52.00 34.00 57.50 34.00 L63 34 A9.25 9.25 0 0 1 63 52.5 L70.27 65.22 Q73.00 70.00 78.50 70.00 L81 70" stroke="#05261a" stroke-width="7"/>
+    <path d="M18 70 L18.00 39.50 Q18.00 34.00 23.50 34.00 L29 34 A9.25 9.25 0 0 1 29 52.5 L36.27 65.22 Q39.00 70.00 44.50 70.00 L46.50 70.00 Q52.00 70.00 52.00 64.50 L52.00 39.50 Q52.00 34.00 57.50 34.00 L63 34 A9.25 9.25 0 0 1 63 52.5 L70.27 65.22 Q73.00 70.00 78.50 70.00 L81 70" stroke="#0f5132" stroke-width="5"/>
+  </g>
+  <circle cx="19.38" cy="35.38" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="29.00" cy="52.50" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="39.69" cy="68.81" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="50.62" cy="68.62" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="53.38" cy="35.38" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="63.00" cy="52.50" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="73.69" cy="68.81" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/>
+  <circle cx="18" cy="70" r="3.8" fill="#fff" stroke="#202124" stroke-width="2"/>
+  <g transform="translate(81 70)">
+    <path d="M0 0C-2.4 -4.2 -7.4 -8 -7.4 -13.5A7.4 7.4 0 0 1 7.4 -13.5C7.4 -8 2.4 -4.2 0 0Z" fill="#ea4335" stroke="#a52714" stroke-width="1" stroke-linejoin="round"/>
+    <circle cx="0" cy="-13.5" r="2.8" fill="#a52714"/>
+  </g></g></g>
+  <rect x=".5" y=".5" width="99" height="99" rx="21.5" fill="none" stroke="#000" stroke-opacity=".08"/>
+</svg>
+    <h1>Route <em>Runner</em></h1>
+    <p class="sub" style="text-align:center">Office dashboard – sign in to see your drivers.</p>
+    <label class="f" for="lEmail">Email</label><input id="lEmail" class="in" type="email" autocomplete="username">
+    <label class="f" for="lPass">Password</label><input id="lPass" class="in" type="password" autocomplete="current-password">
+    <div class="err" id="lErr"></div>
+    <button class="btn accent" id="lGo" style="width:100%;margin-top:8px">Sign in →</button>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header class="top"><div class="top-in">
+    <div class="brand"><svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
+  <defs><clipPath id="rrc"><rect width="100" height="100" rx="22"/></clipPath></defs>
+  <g clip-path="url(#rrc)"><rect width="100" height="100" fill="#eef0f3"/><g transform="translate(0.0 0.0) scale(1.0)">
+  <rect width="100" height="100" fill="#eef0f3"/>
+  <path d="M60 52 L72 51 L73 61 L61 63Z" fill="#c6e8cc"/>
+  <path d="M2 50 L14 50 L14 61 L2 61Z" fill="#c6e8cc"/>
+  <path d="M33 83 L47 82 L48 91 L34 91Z" fill="#c6e8cc"/>
+  <path d="M44 2 L52 2 L52 10 L44 10Z" fill="#d6efd9"/>
+  <path d="M88 0 H100 V44 C95 40 93 33 92 25 C91 16 90 8 88 0Z" fill="#aad3f5"/>
+  <path d="M0 71 C10 68 18 74 26 71 S40 66 48 70 S60 74 66 71" fill="none" stroke="#a6d4f2" stroke-width="1.3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="
+  M0 12 H100 M0 63 H100 M0 90 H100
+  M8 0 V100 M90 0 V100 M38 0 V31 M72 0 V31 M44 73 V100 M66 73 V100 M30 90 V100" stroke="#dde1e6" stroke-width="2.6"/>
+    <path d="
+  M0 12 H100 M0 63 H100 M0 90 H100
+  M8 0 V100 M90 0 V100 M38 0 V31 M72 0 V31 M44 73 V100 M66 73 V100 M30 90 V100" stroke="#ffffff" stroke-width="1.6"/>
+    <path d="M0 34 H100 M0 70 H100 M18 0 V100 M52 0 V100 M29 34 A9.25 9.25 0 0 1 29 52.5 M63 34 A9.25 9.25 0 0 1 63 52.5 M0 52.5 H18 M29 52.5 H52 M63 52.5 H100 M29 52.5 L39 70 L56.14285714285714 100 M63 52.5 L73 70 L90.14285714285714 100" stroke="#dde1e6" stroke-width="4"/>
+    <path d="M0 34 H100 M0 70 H100 M18 0 V100 M52 0 V100 M29 34 A9.25 9.25 0 0 1 29 52.5 M63 34 A9.25 9.25 0 0 1 63 52.5 M0 52.5 H18 M29 52.5 H52 M63 52.5 H100 M29 52.5 L39 70 L56.14285714285714 100 M63 52.5 L73 70 L90.14285714285714 100" stroke="#ffffff" stroke-width="3"/>
+    <path d="M0 36 L46 6 L100 2" stroke="#b8c6d8" stroke-width="3.4"/>
+    <path d="M0 36 L46 6 L100 2" stroke="#d2dcea" stroke-width="2"/>
+  </g>
+  <circle cx="81" cy="56" r="1.9" fill="#e8584a"/><path d="M80.2 55.2v1.6m1.6-1.6v1.6m-1.6-.8h1.6" stroke="#fff" stroke-width=".45"/>
+  <circle cx="9" cy="86" r="1.7" fill="#3b8de0"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 70 L18.00 39.50 Q18.00 34.00 23.50 34.00 L29 34 A9.25 9.25 0 0 1 29 52.5 L36.27 65.22 Q39.00 70.00 44.50 70.00 L46.50 70.00 Q52.00 70.00 52.00 64.50 L52.00 39.50 Q52.00 34.00 57.50 34.00 L63 34 A9.25 9.25 0 0 1 63 52.5 L70.27 65.22 Q73.00 70.00 78.50 70.00 L81 70" stroke="#05261a" stroke-width="7"/>
+    <path d="M18 70 L18.00 39.50 Q18.00 34.00 23.50 34.00 L29 34 A9.25 9.25 0 0 1 29 52.5 L36.27 65.22 Q39.00 70.00 44.50 70.00 L46.50 70.00 Q52.00 70.00 52.00 64.50 L52.00 39.50 Q52.00 34.00 57.50 34.00 L63 34 A9.25 9.25 0 0 1 63 52.5 L70.27 65.22 Q73.00 70.00 78.50 70.00 L81 70" stroke="#0f5132" stroke-width="5"/>
+  </g>
+  <circle cx="19.38" cy="35.38" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="29.00" cy="52.50" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="39.69" cy="68.81" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="50.62" cy="68.62" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="53.38" cy="35.38" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="63.00" cy="52.50" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/><circle cx="73.69" cy="68.81" r="1.35" fill="#fff" stroke="#05261a" stroke-width=".6"/>
+  <circle cx="18" cy="70" r="3.8" fill="#fff" stroke="#202124" stroke-width="2"/>
+  <g transform="translate(81 70)">
+    <path d="M0 0C-2.4 -4.2 -7.4 -8 -7.4 -13.5A7.4 7.4 0 0 1 7.4 -13.5C7.4 -8 2.4 -4.2 0 0Z" fill="#ea4335" stroke="#a52714" stroke-width="1" stroke-linejoin="round"/>
+    <circle cx="0" cy="-13.5" r="2.8" fill="#a52714"/>
+  </g></g></g>
+  <rect x=".5" y=".5" width="99" height="99" rx="21.5" fill="none" stroke="#000" stroke-opacity=".08"/>
+</svg><div><b>Route <em>Runner</em></b><small id="coName">Dashboard</small></div></div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="live" class="on">Live</button>
+      <button data-tab="days">Days</button>
+      <button data-tab="people" data-admin>People</button>
+      <button data-tab="settings" data-admin>Settings</button>
+      <button data-tab="activity" data-admin>Activity</button>
+    </nav>
+    <div class="who"><div class="av" id="meAv">?</div><div><b id="meName" style="color:var(--ink)"></b><div id="meRole"></div></div>
+      <button class="btn small ghost" id="outBtn">Sign out</button></div>
+  </div></header>
+  <main>
+    <section id="t-live">
+      <div class="h2row"><h2>Live</h2><span class="sub" id="liveAt"></span><span class="sp"></span><button class="btn small ghost" id="liveFit">Show all drivers</button></div>
+      <div class="grid g2"><div id="map"></div><div class="drivers" id="drvList"></div></div>
+    </section>
+    <section id="t-days" class="hidden">
+      <div class="h2row"><h2>Days</h2><span class="sp"></span>
+        <select id="fDriver" class="in" style="width:auto"></select>
+        <input id="fFrom" class="in" type="date" style="width:auto"> <span class="sub">to</span> <input id="fTo" class="in" type="date" style="width:auto">
+        <button class="btn small" id="fGo">Show</button></div>
+      <div class="card tbl"><table id="daysTbl"></table></div>
+    </section>
+    <section id="t-people" class="hidden">
+      <div class="h2row"><h2>People</h2><span class="sp"></span><button class="btn small accent" id="addDrv">+ Add driver</button><button class="btn small" id="addOffice">+ Add office login</button></div>
+      <div class="card tbl"><table id="pplTbl"></table></div>
+      <p class="sub">Drivers sign in on the phone with the company code <b id="coCode2"></b>, their username and PIN. Switching someone off blocks them straight away; their past records stay.</p>
+    </section>
+    <section id="t-settings" class="hidden">
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+        <div class="card">
+          <h2 style="font-size:18px">Delivery safety <span class="sub">– applies to every phone</span></h2>
+          <label class="switch"><span>Check the parcel matches the delivery address (GPS) before it can be handed over</span><input type="checkbox" id="sGeo"></label>
+          <label class="f" for="sRad">Allowed distance from the address</label>
+          <select id="sRad" class="in"></select>
+          <label class="f" for="sPin">Supervisor PIN for overrides <span class="sub">(empty = driver only needs a reason)</span></label>
+          <input id="sPin" class="in" inputmode="numeric" autocomplete="off" placeholder="e.g. 4821">
+          <div class="row" style="margin-top:14px"><button class="btn primary" id="sSave">Save for all phones</button><span class="sub" id="sMsg"></span></div>
+          <p class="sub">Phones pick up changes within 5 minutes, or straight away when the driver opens the app.</p>
+        </div>
+        <div class="card">
+          <h2 style="font-size:18px">Company</h2>
+          <p><b id="coName2"></b><br><span class="sub">Company code for phone sign-in:</span> <span class="pill ink" id="coCode"></span></p>
+          <h2 style="font-size:18px;margin-top:18px">Your login</h2>
+          <label class="f" for="myPass">New password</label><input id="myPass" class="in" type="password" autocomplete="new-password" placeholder="At least 8 characters">
+          <div class="row" style="margin-top:10px"><button class="btn" id="myPassGo">Change my password</button></div>
+        </div>
+      </div>
+    </section>
+    <section id="t-activity" class="hidden">
+      <div class="h2row"><h2>Activity</h2><span class="sub">Who did what – sign-ins, people changes, safety changes</span></div>
+      <div class="card tbl"><table id="actTbl"></table></div>
+    </section>
+  </main>
+</div>
+<div id="modal" class="modal hidden"><div class="card" id="modalCard"></div></div>
+
+<script src="lib/leaflet.js"></script>
+<script src="lib/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+'use strict';
+const CFG = window.RR_CONFIG || {};
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = (n) => String(n).padStart(2, '0');
+const fmtT = (t) => { if (t == null) return '–'; const d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+const fmtD = (t) => new Date(t).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const fmtDT = (t) => new Date(t).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const ago = (t) => { const s = (Date.now() - new Date(t)) / 1000; return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' days ago'; };
+const fmtDur = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + pad(m % 60); };
+const DRIVER_DOMAIN = CFG.driverDomain || 'drivers.routerunner.app';
+const ROLE = { owner: 'Owner', manager: 'Manager', dispatcher: 'Dispatcher', driver: 'Driver' };
+const PHASE = { loading: ['Loading', ''], planned: ['Route planned', 'warn'], running: ['On the road', 'ok'], done: ['Finished', 'ink'] };
+function toast(t, bad) { const d = document.createElement('div'); d.className = 'toast' + (bad ? ' bad' : ''); d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 3500); }
+function modal(html, wide) { $('#modalCard').className = 'card' + (wide ? ' wide' : ''); $('#modalCard').innerHTML = html; $('#modal').classList.remove('hidden'); }
+function closeModal() { $('#modal').classList.add('hidden'); $('#modalCard').innerHTML = ''; }
+$('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal' || e.target.closest('[data-close]')) closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+if (!CFG.url || !CFG.key || !window.supabase) { document.body.innerHTML = '<div class="empty">Route Runner dashboard is not connected yet (config.js is empty).</div>'; throw new Error('no config'); }
+const sb = supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'rr.dash' } });
+let ME = null, PEOPLE = [], tab = 'live';
+const isAdmin = () => ME && (ME.role === 'owner' || ME.role === 'manager');
+const person = (id) => PEOPLE.find((p) => p.user_id === id);
+const logEvent = (a, d) => sb.rpc('log_event', { p_action: a, p_detail: d || null }).then(() => {}, () => {});
+
+/* ---------- sign in ---------- */
+async function start() {
+  const s = (await sb.auth.getSession()).data.session;
+  if (s && await loadMe()) return showApp();
+  $('#login').classList.remove('hidden');
+}
+async function loadMe() {
+  const { data } = await sb.rpc('whoami');
+  if (!data || data.role === 'driver') return false;
+  ME = data; return true;
+}
+async function signIn() {
+  const email = $('#lEmail').value.trim(), pass = $('#lPass').value;
+  const err = (t) => { $('#lErr').textContent = t; };
+  if (!email || !pass) return err('Enter your email and password.');
+  $('#lGo').disabled = true;
+  try {
+    const r = await sb.auth.signInWithPassword({ email, password: pass });
+    if (r.error) return err(/invalid/i.test(r.error.message) ? 'Wrong email or password.' : r.error.message);
+    if (!(await loadMe())) { await sb.auth.signOut(); return err('This login has no dashboard access (drivers use the phone app).'); }
+    logEvent('Signed in to dashboard');
+    $('#login').classList.add('hidden'); showApp();
+  } catch (e) { err("Couldn't reach the server – check the internet."); }
+  finally { $('#lGo').disabled = false; }
+}
+$('#lGo').onclick = signIn;
+$('#lPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
+$('#outBtn').onclick = async () => { await logEvent('Signed out of dashboard'); await sb.auth.signOut(); location.reload(); };
+
+async function showApp() {
+  $('#app').classList.remove('hidden');
+  $('#coName').textContent = ME.company; $('#coName2').textContent = ME.company; $('#coCode').textContent = ME.code; $('#coCode2').textContent = ME.code;
+  $('#meName').textContent = ME.name; $('#meRole').textContent = ROLE[ME.role]; $('#meAv').textContent = (ME.name || '?').trim()[0].toUpperCase();
+  document.querySelectorAll('[data-admin]').forEach((b) => b.classList.toggle('hidden', !isAdmin()));
+  await loadPeople();
+  const to = new Date(), from = new Date(Date.now() - 6 * 864e5);
+  $('#fFrom').value = isoDate(from); $('#fTo').value = isoDate(to);
+  showTab('live');
+  setInterval(() => { if (tab === 'live' && !document.hidden) loadLive(); }, 20000);
+  setInterval(async () => { if (!(await loadMe())) location.reload(); }, 300000);   // switched off → out
+}
+document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
+  for (const id of ['live', 'days', 'people', 'settings', 'activity']) $('#t-' + id).classList.toggle('hidden', id !== t);
+  if (t === 'live') loadLive();
+  if (t === 'days') loadDays();
+  if (t === 'people') renderPeople();
+  if (t === 'settings') renderSettings();
+  if (t === 'activity') loadActivity();
+}
+async function loadPeople() {
+  const { data } = await sb.from('profiles').select('*').order('role').order('name');
+  PEOPLE = data || [];
+  $('#fDriver').innerHTML = '<option value="">All drivers</option>' + PEOPLE.filter((p) => p.role === 'driver').map((p) => `<option value="${p.user_id}">${esc(p.name)}</option>`).join('');
+}
+
+/* ---------- live map ---------- */
+let map, liveLayer, liveFirst = true;
+const COLORS = ['#2f9b5f', '#3b7dd8', '#c0661a', '#8e44ad', '#c0362c', '#16a085', '#d35400', '#2c3e50'];
+const colorFor = (id) => { const i = PEOPLE.filter((p) => p.role === 'driver').findIndex((p) => p.user_id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+function tiles(m) { L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(m); }
+async function loadLive() {
+  if (!map) { map = L.map('map').setView([-33.96, 25.6], 11); tiles(map); liveLayer = L.layerGroup().addTo(map); }
+  setTimeout(() => map.invalidateSize(), 50);
+  const { data, error } = await sb.from('live').select('*');
+  if (error) { toast(error.message, true); return; }
+  const rows = (data || []).filter((r) => person(r.driver_id)).sort((a, b) => new Date(b.at) - new Date(a.at));
+  liveLayer.clearLayers(); const pts = [];
+  for (const r of rows) {
+    if (r.lat == null) continue;
+    const p = person(r.driver_id), stale = Date.now() - new Date(r.at) > 15 * 60000;
+    const ic = L.divIcon({ className: '', html: `<div class="mk ${stale ? 'stale' : ''}" style="background:${colorFor(r.driver_id)}">${esc(initials(p.name))}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+    L.marker([r.lat, r.lng], { icon: ic }).addTo(liveLayer).bindPopup(`<b>${esc(p.name)}</b><br>${esc((PHASE[r.phase] || [r.phase])[0] || '')} · ${r.delivered ?? 0}/${r.total ?? 0} delivered<br><span class="sub">${ago(r.at)}</span>`);
+    pts.push([r.lat, r.lng]);
+  }
+  if (pts.length && liveFirst) { map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 }); liveFirst = false; }
+  $('#liveFit').onclick = () => pts.length && map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
+  $('#liveAt').textContent = 'Updated ' + fmtT(Date.now()) + ' · refreshes every 20 s';
+  const drivers = PEOPLE.filter((p) => p.role === 'driver' && p.active);
+  $('#drvList').innerHTML = drivers.map((p) => {
+    const r = rows.find((x) => x.driver_id === p.user_id), ph = r && PHASE[r.phase];
+    const today = r && isoDate(new Date(r.at)) === isoDate(new Date());
+    const pct = r && r.total ? Math.round(100 * (r.delivered || 0) / r.total) : 0;
+    return `<div class="drv" data-drv="${p.user_id}" data-day="${r && r.day_id ? esc(r.day_id) : ''}">
+      <div class="row"><span class="dot" style="color:${colorFor(p.user_id)}"></span><span class="nm">${esc(p.name)}</span><span class="sp"></span>
+      ${r && today && ph ? `<span class="pill ${ph[1]}">${ph[0]}</span>` : '<span class="pill">Not active today</span>'}</div>
+      ${r && today ? `<div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="row sub"><span>${r.delivered || 0} of ${r.total || 0} delivered</span><span class="sp"></span>${r.back_at && r.phase !== 'done' ? `<span>back ~${fmtT(r.back_at)}</span>` : ''}</div>
+      ${r.next_stop && r.phase === 'running' ? `<div class="sub">Next: ${esc(r.next_stop)}</div>` : ''}` : ''}
+      <div class="sub">${r ? 'Last seen ' + ago(r.at) : 'Never signed in'}</div></div>`;
+  }).join('') || '<div class="card empty">No drivers yet. Add them under People.</div>';
+  document.querySelectorAll('.drv').forEach((el) => (el.onclick = () => {
+    const r = rows.find((x) => x.driver_id === el.dataset.drv);
+    if (el.dataset.day) openDay(el.dataset.day); else if (r && r.lat != null) map.setView([r.lat, r.lng], 15);
+  }));
+}
+const initials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+/* ---------- days ---------- */
+$('#fGo').onclick = loadDays;
+async function loadDays() {
+  let q = sb.from('days').select('id,driver_id,day,phase,started_at,ended_at,parcels,delivered,failed,returned,overrides,planned_km,gps_km,odo_km,vehicle,updated_at')
+    .gte('day', $('#fFrom').value).lte('day', $('#fTo').value).order('day', { ascending: false }).order('started_at', { ascending: false }).limit(500);
+  if ($('#fDriver').value) q = q.eq('driver_id', $('#fDriver').value);
+  const { data, error } = await q;
+  if (error) { toast(error.message, true); return; }
+  const rows = data || [];
+  $('#daysTbl').innerHTML = `<thead><tr><th>Date</th><th>Driver</th><th>Status</th><th class="num">Parcels</th><th class="num">Delivered</th><th class="num">Failed</th><th class="num">Returned</th><th class="num">Overrides</th><th class="num">GPS km</th><th class="num">Odo km</th><th>Times</th><th>Vehicle</th></tr></thead><tbody>` +
+    (rows.map((d) => { const ph = PHASE[d.phase] || [d.phase || '–', '']; return `<tr class="click" data-day="${esc(d.id)}">
+      <td>${esc(fmtD(d.day + 'T12:00'))}</td><td>${esc((person(d.driver_id) || {}).name || '?')}</td><td><span class="pill ${ph[1]}">${esc(ph[0])}</span></td>
+      <td class="num">${d.parcels}</td><td class="num">${d.delivered}</td><td class="num">${d.failed || ''}</td><td class="num">${d.returned || ''}</td>
+      <td class="num">${d.overrides ? `<span class="pill bad">${d.overrides}</span>` : ''}</td>
+      <td class="num">${d.gps_km != null ? (+d.gps_km).toFixed(1) : '–'}</td><td class="num">${d.odo_km ?? '–'}</td>
+      <td>${d.started_at ? fmtT(d.started_at) + '–' + (d.ended_at ? fmtT(d.ended_at) : '…') : '–'}</td><td>${esc(d.vehicle || '')}</td></tr>`; }).join('')
+      || '<tr><td colspan="12" class="empty">No days in this period.</td></tr>') + '</tbody>';
+  const tot = rows.reduce((a, d) => ({ p: a.p + d.parcels, d: a.d + d.delivered, f: a.f + (d.failed || 0), k: a.k + (+d.gps_km || 0) }), { p: 0, d: 0, f: 0, k: 0 });
+  if (rows.length) $('#daysTbl').insertAdjacentHTML('beforeend', `<tfoot><tr><th colspan="3">${rows.length} day(s)</th><th class="num">${tot.p}</th><th class="num">${tot.d}</th><th class="num">${tot.f}</th><th></th><th></th><th class="num">${tot.k.toFixed(1)}</th><th colspan="3"></th></tr></tfoot>`);
+  document.querySelectorAll('#daysTbl tr[data-day]').forEach((tr) => (tr.onclick = () => openDay(tr.dataset.day)));
+}
+
+/* ---------- one day in detail ---------- */
+let dayMap = null;
+async function openDay(id) {
+  const [{ data: d, error }, { data: tr }] = await Promise.all([
+    sb.from('days').select('*').eq('id', id).maybeSingle(),
+    sb.from('tracks').select('seq,points').eq('day_id', id).order('seq')]);
+  if (error || !d) { toast(error ? error.message : 'Day not found', true); return; }
+  const track = (tr || []).flatMap((t) => t.points);
+  const P = d.data.parcels || [], R = d.data.run || {}, drv = person(d.driver_id) || { name: '?' };
+  const list = P.slice().sort((a, b) => (a.seq || 1e9) - (b.seq || 1e9) || (a.done ? a.done.at : 9e15) - (b.done ? b.done.at : 9e15));
+  const ph = PHASE[d.phase] || [d.phase || '', ''];
+  modal(`<div class="h2row"><h2>${esc(drv.name)} · ${esc(fmtD(d.day + 'T12:00'))}</h2><span class="pill ${ph[1]}">${esc(ph[0])}</span><span class="sp"></span>
+      <button class="btn small" id="dCsv">Download CSV</button><button class="btn small" id="dGpx" ${track.length ? '' : 'disabled'}>GPS track (.gpx)</button><button class="btn small ghost" data-close>Close</button></div>
+    <div class="tiles">
+      <div class="tile"><b>${d.delivered}/${d.parcels}</b><span>delivered</span></div>
+      <div class="tile"><b>${d.failed}</b><span>failed</span></div>
+      <div class="tile"><b>${d.returned}</b><span>returned</span></div>
+      <div class="tile" style="${d.overrides ? 'background:var(--bad-bg);color:var(--bad)' : ''}"><b>${d.overrides}</b><span>location overrides</span></div>
+      <div class="tile"><b>${d.gps_km != null ? (+d.gps_km).toFixed(1) : '–'} km</b><span>GPS distance${d.planned_km ? ' · planned ' + d.planned_km : ''}</span></div>
+      <div class="tile"><b>${d.odo_km ?? '–'}${d.odo_km != null ? ' km' : ''}</b><span>odometer${R.odoStart != null ? ` ${R.odoStart}→${R.odoEnd ?? '…'}` : ''}</span></div>
+      <div class="tile"><b>${d.started_at ? fmtT(d.started_at) + '–' + (d.ended_at ? fmtT(d.ended_at) : '…') : '–'}</b><span>${d.started_at && d.ended_at ? fmtDur(new Date(d.ended_at) - new Date(d.started_at)) : 'start – finish'}${R.lunch ? ' · lunch ' + fmtT(R.lunch.start) : ''}</span></div>
+      <div class="tile"><b>${esc(d.vehicle || '–')}</b><span>vehicle</span></div>
+    </div>
+    <div id="dayMap"></div>
+    <div class="tbl" style="margin-top:14px"><table><thead><tr><th>Stop</th><th>Parcel</th><th>Recipient / address</th><th>Result</th><th>Time</th><th>Location check</th><th>Received by</th><th>Proof</th></tr></thead><tbody>
+    ${list.map((p) => { const D = p.done; const res = !D ? '<span class="pill">Not delivered</span>' : D.kind === 'delivered' ? '<span class="pill ok">Delivered</span>' : D.kind === 'failed' ? `<span class="pill bad">Failed</span> <span class="sub">${esc(D.reason || '')}</span>` : `<span class="pill warn">Returned</span> <span class="sub">${esc(D.reason || '')}</span>`;
+      const chk = D && D.kind === 'delivered' ? (D.check === 'override' ? `<span class="pill bad">OVERRIDE</span> <span class="sub">${esc(D.override || '')}${D.distAddr != null ? ' · ' + D.distAddr + ' m away' : ''}</span>` : D.check === 'ok' ? `<span class="pill ok">OK</span> <span class="sub">${D.distAddr != null ? D.distAddr + ' m' : ''}</span>` : `<span class="sub">${esc(D.check || '')}</span>`) : '';
+      const up = D && D.pod && D.pod.up || {};
+      return `<tr><td>${p.seq || ''}</td><td><b>${esc(p.ref || '')}</b>${D && D.typed ? '<br><span class="sub">typed in</span>' : ''}</td><td>${esc(p.name || '')}${p.phone ? ' · ' + esc(p.phone) : ''}<br><span class="sub">${esc(p.address || '')}</span></td>
+        <td>${res}</td><td>${D ? fmtT(D.at) : p.eta ? '<span class="sub">ETA ' + fmtT(p.eta) + '</span>' : ''}</td><td>${chk}</td><td>${esc(D && D.receivedBy || '')}</td>
+        <td><div class="thumbs">${up.photo && typeof up.photo === 'string' ? `<img data-path="${esc(up.photo)}" alt="Photo">` : ''}${up.sig && typeof up.sig === 'string' ? `<img data-path="${esc(up.sig)}" alt="Signature" style="background:#fff">` : ''}${D && D.pod && (D.pod.photo || D.pod.sig) && !up.photo && !up.sig ? '<span class="sub">uploading…</span>' : ''}</div></td></tr>`; }).join('')}
+    </tbody></table></div>`, true);
+  // photos via short-lived private links
+  const imgs = [...document.querySelectorAll('#modalCard img[data-path]')];
+  if (imgs.length) {
+    const { data: urls } = await sb.storage.from('pod').createSignedUrls(imgs.map((i) => i.dataset.path), 3600);
+    (urls || []).forEach((u, i) => { if (u.signedUrl) { imgs[i].src = u.signedUrl; imgs[i].onclick = () => window.open(u.signedUrl, '_blank', 'noopener'); } });
+  }
+  // map: driven track + stops
+  if (dayMap) { dayMap.remove(); dayMap = null; }
+  dayMap = L.map('dayMap'); tiles(dayMap); const b = [];
+  if (track.length) { const ll = track.map((t) => [t[0], t[1]]); L.polyline(ll, { color: '#3b7dd8', weight: 4, opacity: .85 }).addTo(dayMap); b.push(...ll); }
+  const base = d.data.base; if (base) { L.marker([base.lat, base.lng], { icon: L.divIcon({ className: '', html: '<div class="stop" style="background:#222">S</div>', iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(dayMap).bindPopup('Start / return: ' + esc(base.label || '')); b.push([base.lat, base.lng]); }
+  for (const p of list) {
+    const D = p.done; const at = D && D.lat != null ? [D.lat, D.lng] : p.lat != null ? [p.lat, p.lng] : null; if (!at) continue;
+    const cls = !D ? '' : D.kind === 'delivered' ? (D.check === 'override' ? 'warn' : 'ok') : 'bad';
+    L.marker(at, { icon: L.divIcon({ className: '', html: `<div class="stop ${cls}">${p.seq || '•'}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(dayMap)
+      .bindPopup(`<b>${esc(p.ref || '')}</b> ${esc(p.name || '')}<br>${esc(p.address || '')}<br>${D ? esc(D.kind) + ' ' + fmtT(D.at) : 'not delivered'}`);
+    b.push(at);
+  }
+  if (b.length) dayMap.fitBounds(b, { padding: [30, 30], maxZoom: 15 }); else dayMap.setView([-33.96, 25.6], 11);
+  setTimeout(() => dayMap.invalidateSize(), 80);
+  $('#dCsv').onclick = () => download(`route-runner_${d.day}_${(drv.name || 'driver').replace(/\W+/g, '-')}.csv`, dayCsv(d, list), 'text/csv');
+  $('#dGpx').onclick = () => download(`route-runner_${d.day}_${(drv.name || 'driver').replace(/\W+/g, '-')}.gpx`, gpx(d, track, list), 'application/gpx+xml');
+}
+function download(name, text, type) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const csvCell = (v) => { const s = String(v ?? ''); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+const mapCell = (lat, lng) => `=HYPERLINK("https://www.google.com/maps?q=${(+lat).toFixed(6)},${(+lng).toFixed(6)}")`;
+function dayCsv(d, list) {
+  const rows = [['Stop', 'Reference', 'Recipient', 'Phone', 'Address', 'Status', 'Completed', 'Minutes since previous', 'Km since previous', 'Delivery latitude', 'Delivery longitude',
+    'GPS accuracy (m)', 'Distance from address (m)', 'Location check', 'Override reason', 'Entered by', 'Received by', 'Photo', 'Signature', 'Delivery map', 'Address map']];
+  for (const p of list) {
+    const D = p.done;
+    rows.push([p.seq || '', p.ref, p.name, p.phone || '', p.address, D ? (D.kind === 'cancelled' ? 'returned – ' + (D.reason || '') : D.kind + (D.reason ? ' – ' + D.reason : '')) : 'not delivered',
+      D ? fmtT(D.at) : '', D && D.legMin != null ? D.legMin.toFixed(1) : '', D && D.legKm != null ? D.legKm.toFixed(2) : '',
+      D && D.lat != null ? D.lat.toFixed(6) : '', D && D.lng != null ? D.lng.toFixed(6) : '', D ? D.acc ?? '' : '', D && D.distAddr != null ? D.distAddr : '',
+      D && D.kind === 'delivered' ? ({ ok: 'OK', override: 'OVERRIDE', unverified: 'Not verified', off: 'Check off' }[D.check] || '') : '', D && D.override || '',
+      D && D.kind === 'delivered' ? (D.typed ? 'Typed tracking no.' : 'Scanned') : '', D && D.receivedBy || '',
+      D && D.pod && D.pod.photo ? 'yes' : '', D && D.pod && D.pod.sig ? 'yes' : '',
+      D && D.lat != null ? mapCell(D.lat, D.lng) : '', p.lat != null ? mapCell(p.lat, p.lng) : '']);
+  }
+  const drv = person(d.driver_id) || {};
+  rows.push([], ['Driver', drv.name || ''], ['Day', d.day], ['Started', d.started_at ? fmtT(d.started_at) : ''], ['Finished', d.ended_at ? fmtT(d.ended_at) : ''],
+    ['Tracked GPS distance (km)', d.gps_km ?? ''], ['Odometer distance (km)', d.odo_km ?? ''], ['Vehicle', d.vehicle || ''],
+    ['Delivered', d.delivered], ['Failed', d.failed], ['Returned', d.returned], ['Location overrides', d.overrides]);
+  return '﻿' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
+}
+function gpx(d, track, list) {
+  const w = list.filter((p) => p.done && p.done.lat != null).map((p) => `<wpt lat="${p.done.lat}" lon="${p.done.lng}"><time>${new Date(p.done.at).toISOString()}</time><name>${esc((p.seq ? '#' + p.seq + ' ' : '') + (p.ref || ''))}</name></wpt>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Route Runner" xmlns="http://www.topografix.com/GPX/1/1">${w}<trk><name>${d.day}</name><trkseg>${track.map((t) => `<trkpt lat="${t[0]}" lon="${t[1]}"><time>${new Date(t[2]).toISOString()}</time></trkpt>`).join('')}</trkseg></trk></gpx>`;
+}
+
+/* ---------- people ---------- */
+const temp = sb && supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'rr.tmp' } });
+const randPin = () => String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+const randPass = () => { const a = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; return [...crypto.getRandomValues(new Uint8Array(10))].map((x) => a[x % a.length]).join(''); };
+async function renderPeople() {
+  await loadPeople();
+  const { data: live } = await sb.from('live').select('driver_id,at');
+  $('#pplTbl').innerHTML = `<thead><tr><th>Name</th><th>Role</th><th>Signs in with</th><th>Phone</th><th>Last seen on phone</th><th>Status</th><th></th></tr></thead><tbody>` +
+    PEOPLE.map((p) => { const l = (live || []).find((x) => x.driver_id === p.user_id); return `<tr>
+      <td><b>${esc(p.name)}</b>${p.user_id === ME.user_id ? ' <span class="sub">(you)</span>' : ''}</td><td>${ROLE[p.role]}</td>
+      <td>${p.role === 'driver' ? `<span class="pill ink">${esc(ME.code)}</span> · <b>${esc(p.username)}</b> · PIN` : esc(p.email || '')}</td><td>${esc(p.phone || '')}</td>
+      <td class="sub">${l ? ago(l.at) : p.role === 'driver' ? 'never' : ''}</td>
+      <td>${p.active ? '<span class="pill ok">Active</span>' : '<span class="pill bad">Switched off</span>'}</td>
+      <td style="white-space:nowrap">${canEdit(p) ? `<button class="btn small" data-edit="${p.user_id}">Edit</button> <button class="btn small ghost" data-reset="${p.user_id}">${p.role === 'driver' ? 'New PIN' : 'New password'}</button>` : ''}</td></tr>`; }).join('') + '</tbody>';
+  document.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editPerson(person(b.dataset.edit))));
+  document.querySelectorAll('[data-reset]').forEach((b) => (b.onclick = () => resetPerson(person(b.dataset.reset))));
+  $('#addOffice').classList.toggle('hidden', !isAdmin());
+}
+const canEdit = (p) => isAdmin() && (ME.role === 'owner' || !['owner', 'manager'].includes(p.role) || p.user_id === ME.user_id);
+$('#addDrv').onclick = () => {
+  modal(`<h2>Add a driver</h2><p class="sub">The driver signs in on the phone with company code <b>${esc(ME.code)}</b>, this username and a PIN.</p>
+    <label class="f" for="nName">Full name</label><input id="nName" class="in" placeholder="e.g. Sipho Ndlovu">
+    <label class="f" for="nUser">Username (letters and numbers)</label><input id="nUser" class="in" autocapitalize="none" placeholder="e.g. sipho">
+    <label class="f" for="nPhone">Cell number (optional)</label><input id="nPhone" class="in" inputmode="tel">
+    <div class="err" id="nErr"></div>
+    <div class="row" style="margin-top:8px"><button class="btn ghost" data-close>Cancel</button><span class="sp"></span><button class="btn primary" id="nGo">Create driver</button></div>`);
+  $('#nName').oninput = () => { if (!$('#nUser').dataset.touched) $('#nUser').value = $('#nName').value.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, ''); };
+  $('#nUser').oninput = () => { $('#nUser').dataset.touched = 1; };
+  $('#nGo').onclick = async () => {
+    const name = $('#nName').value.trim(), user = $('#nUser').value.trim().toLowerCase(), err = (t) => { $('#nErr').textContent = t; };
+    if (!name) return err('Enter the driver\'s name.');
+    if (!/^[a-z0-9]{2,20}$/.test(user)) return err('Username: 2–20 letters or numbers, no spaces.');
+    if (PEOPLE.some((p) => p.username === user)) return err('That username is taken.');
+    const pin = randPin(); $('#nGo').disabled = true;
+    try {
+      const su = await temp.auth.signUp({ email: `${user}.${ME.code}@${DRIVER_DOMAIN}`.toLowerCase(), password: pin });
+      if (su.error) return err(/registered/i.test(su.error.message) ? 'That username is taken.' : su.error.message);
+      if (!su.data.user || !su.data.user.id || (su.data.user.identities && su.data.user.identities.length === 0)) return err('That username is taken.');
+      const r = await sb.rpc('add_member', { p_user: su.data.user.id, p_role: 'driver', p_name: name, p_username: user, p_phone: $('#nPhone').value.trim() || null });
+      if (r.error) return err(r.error.message);
+      await temp.auth.signOut().catch(() => {});
+      showSecret(`${esc(name)} is ready`, `Give these to ${esc(name.split(' ')[0])} for the phone:`, [['Company code', ME.code], ['Username', user], ['PIN', pin]]);
+      renderPeople();
+    } finally { const b = $('#nGo'); if (b) b.disabled = false; }
+  };
+};
+$('#addOffice').onclick = () => {
+  modal(`<h2>Add an office login</h2><p class="sub">For the dashboard. Dispatchers can watch drivers and days; managers can also add people and change settings.</p>
+    <label class="f" for="oName">Full name</label><input id="oName" class="in">
+    <label class="f" for="oEmail">Email</label><input id="oEmail" class="in" type="email">
+    <label class="f" for="oRole">Role</label><select id="oRole" class="in"><option value="dispatcher">Dispatcher – view only</option>${ME.role === 'owner' ? '<option value="manager">Manager – people and settings</option>' : ''}</select>
+    <div class="err" id="oErr"></div>
+    <div class="row" style="margin-top:8px"><button class="btn ghost" data-close>Cancel</button><span class="sp"></span><button class="btn primary" id="oGo">Create login</button></div>`);
+  $('#oGo').onclick = async () => {
+    const name = $('#oName').value.trim(), email = $('#oEmail').value.trim().toLowerCase(), role = $('#oRole').value, err = (t) => { $('#oErr').textContent = t; };
+    if (!name || !/^\S+@\S+\.\S+$/.test(email)) return err('Enter a name and a valid email.');
+    const pass = randPass(); $('#oGo').disabled = true;
+    try {
+      const su = await temp.auth.signUp({ email, password: pass });
+      if (su.error) return err(/registered/i.test(su.error.message) ? 'That email already has a login.' : su.error.message);
+      if (!su.data.user || (su.data.user.identities && su.data.user.identities.length === 0)) return err('That email already has a login.');
+      const r = await sb.rpc('add_member', { p_user: su.data.user.id, p_role: role, p_name: name });
+      if (r.error) return err(r.error.message);
+      await temp.auth.signOut().catch(() => {});
+      showSecret(`${esc(name)} can sign in`, 'Send these to them – they can change the password under Settings:', [['Dashboard', location.href.split('#')[0]], ['Email', email], ['Password', pass]]);
+      renderPeople();
+    } finally { const b = $('#oGo'); if (b) b.disabled = false; }
+  };
+};
+function showSecret(title, intro, pairs) {
+  const text = pairs.map(([k, v]) => `${k}: ${v}`).join('\n');
+  modal(`<h2>${title}</h2><p class="sub">${intro}</p>${pairs.map(([k, v]) => `<label class="f">${esc(k)}</label><div class="secret" style="font-size:${String(v).length > 16 ? 16 : 24}px">${esc(v)}</div>`).join('')}
+    <p class="sub">This won't be shown again. If it gets lost, use “${pairs[2][0] === 'PIN' ? 'New PIN' : 'New password'}”.</p>
+    <div class="row"><button class="btn" id="cpy">Copy</button><span class="sp"></span><button class="btn primary" data-close>Done</button></div>`);
+  $('#cpy').onclick = () => navigator.clipboard.writeText(text).then(() => toast('Copied'), () => toast('Copy failed – write it down', true));
+}
+function editPerson(p) {
+  const roles = p.role === 'driver' ? ['driver'] : p.role === 'owner' ? ['owner'] : ME.role === 'owner' ? ['manager', 'dispatcher'] : ['dispatcher'];
+  modal(`<h2>Edit ${esc(p.name)}</h2>
+    <label class="f" for="eName">Full name</label><input id="eName" class="in" value="${esc(p.name)}">
+    <label class="f" for="ePhone">Cell number</label><input id="ePhone" class="in" value="${esc(p.phone || '')}">
+    <label class="f" for="eRole">Role</label><select id="eRole" class="in">${roles.map((r) => `<option value="${r}" ${r === p.role ? 'selected' : ''}>${ROLE[r]}</option>`).join('')}</select>
+    ${p.user_id === ME.user_id ? '' : `<label class="switch"><span>Active – can sign in<br><span class="sub">Switch off when someone leaves or loses their phone. Their records stay.</span></span><input type="checkbox" id="eAct" ${p.active ? 'checked' : ''}></label>`}
+    <div class="err" id="eErr"></div>
+    <div class="row" style="margin-top:8px"><button class="btn ghost" data-close>Cancel</button><span class="sp"></span><button class="btn primary" id="eGo">Save</button></div>`);
+  $('#eGo').onclick = async () => {
+    const r = await sb.rpc('update_member', { p_user: p.user_id, p_name: $('#eName').value.trim() || p.name, p_role: $('#eRole').value, p_active: $('#eAct') ? $('#eAct').checked : true, p_phone: $('#ePhone').value.trim() || null });
+    if (r.error) { $('#eErr').textContent = r.error.message; return; }
+    closeModal(); toast('Saved'); renderPeople();
+  };
+}
+function resetPerson(p) {
+  const drv = p.role === 'driver', secret = drv ? randPin() : randPass();
+  modal(`<h2>${drv ? 'New PIN' : 'New password'} for ${esc(p.name)}</h2><p class="sub">The old ${drv ? 'PIN' : 'password'} stops working and they are signed out everywhere.${drv ? ' Anything on their phone that has not uploaded yet stays on the phone and uploads after they sign in again.' : ''}</p>
+    <div class="err" id="rErr"></div><div class="row"><button class="btn ghost" data-close>Cancel</button><span class="sp"></span><button class="btn danger" id="rGo">Make a new ${drv ? 'PIN' : 'password'}</button></div>`);
+  $('#rGo').onclick = async () => {
+    const r = await sb.rpc('reset_login', { p_user: p.user_id, p_secret: secret });
+    if (r.error) { $('#rErr').textContent = r.error.message; return; }
+    showSecret(`New ${drv ? 'PIN' : 'password'} for ${esc(p.name)}`, 'Give this to them:', drv ? [['Company code', ME.code], ['Username', p.username], ['PIN', secret]] : [['Dashboard', location.href.split('#')[0]], ['Email', p.email], ['Password', secret]]);
+  };
+}
+
+/* ---------- settings ---------- */
+async function renderSettings() {
+  const { data } = await sb.from('companies').select('safety').eq('id', ME.company_id).maybeSingle();
+  const z = (data && data.safety) || {};
+  $('#sGeo').checked = z.geoCheck !== false;
+  $('#sRad').innerHTML = [100, 200, 300, 500, 1000].map((v) => `<option value="${v}" ${+z.geoRadius === v ? 'selected' : ''}>${v} m</option>`).join('');
+  $('#sPin').value = z.overridePin || ''; $('#sMsg').textContent = '';
+}
+$('#sSave').onclick = async () => {
+  const pin = $('#sPin').value.replace(/\s/g, '');
+  if (pin && !/^\d{4,8}$/.test(pin)) { $('#sMsg').textContent = 'PIN: 4–8 digits'; return; }
+  const r = await sb.rpc('set_safety', { p_safety: { geoCheck: $('#sGeo').checked, geoRadius: +$('#sRad').value, overridePin: pin } });
+  if (r.error) { $('#sMsg').textContent = r.error.message; return; }
+  $('#sMsg').textContent = 'Saved ✓'; toast('Delivery safety saved for all phones');
+};
+$('#myPassGo').onclick = async () => {
+  const p = $('#myPass').value; if (p.length < 8) { toast('Use at least 8 characters', true); return; }
+  const r = await sb.auth.updateUser({ password: p });
+  if (r.error) { toast(r.error.message, true); return; }
+  $('#myPass').value = ''; logEvent('Changed own password'); toast('Password changed');
+};
+
+/* ---------- activity ---------- */
+async function loadActivity() {
+  const { data, error } = await sb.from('audit').select('*').order('at', { ascending: false }).limit(300);
+  if (error) { toast(error.message, true); return; }
+  $('#actTbl').innerHTML = '<thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead><tbody>' +
+    ((data || []).map((a) => `<tr><td style="white-space:nowrap">${esc(fmtDT(a.at))}</td><td>${esc(a.who || '')}</td><td>${esc(a.action)}${a.detail && a.detail.pinChanged ? ' <span class="sub">(override PIN changed)</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Nothing yet.</td></tr>') + '</tbody>';
+}
+
+start();
+</script>
+</body>
+</html>
