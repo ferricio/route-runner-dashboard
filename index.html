@@ -201,6 +201,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--soft)}
     <nav class="tabs" id="tabs">
       <button data-tab="live" class="on">Live</button>
       <button data-tab="days">Days</button>
+      <button data-tab="waybills">Customer list</button>
       <button data-tab="people" data-admin>People</button>
       <button data-tab="settings" data-admin>Settings</button>
       <button data-tab="activity" data-admin>Activity</button>
@@ -247,6 +248,14 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--soft)}
         </div>
       </div>
     </section>
+    <section id="t-waybills" class="hidden">
+      <div class="h2row"><h2>Customer list</h2><span class="sub" id="wbCount"></span><span class="sp"></span>
+        <input id="wbQ" class="in" type="search" placeholder="Search waybill, name, address…" style="width:260px">
+        <button class="btn small" id="wbTpl">Download template</button>
+        <label class="btn small accent" style="cursor:pointer">Upload Excel / CSV<input id="wbFile" type="file" accept=".xlsx,.xls,.csv" hidden></label></div>
+      <p class="sub" style="margin-top:-4px">Drivers scan or type a waybill number and the phone fills in the customer and address from this list. Uploading the same waybill again updates it.</p>
+      <div class="card tbl"><table id="wbTbl"></table></div>
+    </section>
     <section id="t-activity" class="hidden">
       <div class="h2row"><h2>Activity</h2><span class="sub">Who did what – sign-ins, people changes, safety changes</span></div>
       <div class="card tbl"><table id="actTbl"></table></div>
@@ -257,6 +266,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--soft)}
 
 <script src="lib/leaflet.js"></script>
 <script src="lib/supabase.js"></script>
+<script src="lib/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script>
 'use strict';
@@ -331,7 +341,8 @@ document.querySelectorAll('#tabs button').forEach((b) => (b.onclick = () => show
 function showTab(t) {
   tab = t;
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
-  for (const id of ['live', 'days', 'people', 'settings', 'activity']) $('#t-' + id).classList.toggle('hidden', id !== t);
+  for (const id of ['live', 'days', 'waybills', 'people', 'settings', 'activity']) $('#t-' + id).classList.toggle('hidden', id !== t);
+  if (t === 'waybills') loadWaybills();
   if (t === 'live') loadLive();
   if (t === 'days') loadDays();
   if (t === 'people') renderPeople();
@@ -650,6 +661,96 @@ $('#myPassGo').onclick = async () => {
   const r = await sb.auth.updateUser({ password: p });
   if (r.error) { toast(r.error.message, true); return; }
   $('#myPass').value = ''; logEvent('Changed own password'); toast('Password changed');
+};
+
+/* ---------- customer list (waybills) ---------- */
+const wbNorm = (c) => String(c ?? '').toUpperCase().replace(/\s+/g, '');
+let wbTimer = null;
+$('#wbQ').addEventListener('input', () => { clearTimeout(wbTimer); wbTimer = setTimeout(loadWaybills, 300); });
+async function loadWaybills() {
+  const q = $('#wbQ').value.trim().replace(/[%,()]/g, '');
+  let req = sb.from('waybills').select('waybill,name,phone,address,lat,updated_at', { count: 'exact' }).order('updated_at', { ascending: false }).limit(200);
+  if (q) req = req.or(`waybill.ilike.%${q}%,name.ilike.%${q}%,address.ilike.%${q}%,phone.ilike.%${q}%`);
+  const { data, error, count } = await req;
+  if (error) { toast(error.message, true); return; }
+  $('#wbCount').textContent = q ? `${count ?? 0} match(es)` : `${count ?? 0} waybill(s)`;
+  $('#wbTbl').innerHTML = '<thead><tr><th>Waybill</th><th>Customer</th><th>Phone</th><th>Address</th><th>Updated</th><th></th></tr></thead><tbody>' +
+    ((data || []).map((w) => `<tr><td><b>${esc(w.waybill)}</b></td><td>${esc(w.name || '')}</td><td>${esc(w.phone || '')}</td><td>${esc(w.address)}${w.lat != null ? ' <span class="pill ok">pin</span>' : ''}</td>
+      <td class="sub">${esc(fmtDT(w.updated_at))}</td><td>${isAdmin() ? `<button class="btn small ghost" data-wbdel="${esc(w.waybill)}">Delete</button>` : ''}</td></tr>`).join('')
+      || `<tr><td colspan="6" class="empty">${q ? 'Nothing matches.' : 'No customers yet – upload an Excel sheet.'}</td></tr>`) + '</tbody>';
+  document.querySelectorAll('[data-wbdel]').forEach((b) => (b.onclick = async () => {
+    if (!confirm(`Delete waybill ${b.dataset.wbdel}?`)) return;
+    const r = await sb.from('waybills').delete().eq('company_id', ME.company_id).eq('waybill', b.dataset.wbdel);
+    if (r.error) toast(r.error.message, true); else { toast('Deleted'); loadWaybills(); }
+  }));
+}
+$('#wbTpl').onclick = () => {
+  const ws = XLSX.utils.aoa_to_sheet([['Waybill', 'Customer name', 'Phone', 'Address', 'Suburb', 'City', 'Postal code', 'Notes'],
+    ['PE123456789ZA', 'Thandi Mokoena', '082 111 2222', '12 Main Road', 'Walmer', 'Gqeberha', '6070', 'Gate code 1234']]);
+  ws['!cols'] = [18, 22, 14, 28, 16, 14, 11, 22].map((w) => ({ wch: w }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Customers'); XLSX.writeFile(wb, 'route-runner-customer-list.xlsx');
+};
+const WB_FIELDS = [
+  ['waybill', 'Waybill number', /waybill|tracking|track|consign|parcel|reference|ref\b|^ref|order|barcode|^id$/i, true],
+  ['name', 'Customer name', /name|customer|recipient|consignee|receiver|client/i],
+  ['phone', 'Phone', /phone|cell|mobile|tel|contact/i],
+  ['address', 'Address / street', /address|street|addr|line ?1/i, true],
+  ['suburb', 'Suburb', /suburb|area|district|line ?2/i],
+  ['city', 'City / town', /city|town/i],
+  ['postal', 'Postal code', /post|zip/i],
+  ['province', 'Province', /province|state|region/i],
+  ['lat', 'Latitude', /^lat/i], ['lng', 'Longitude', /^(lng|lon|long)/i],
+  ['notes', 'Notes', /note|comment|instruction/i]];
+$('#wbFile').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let rows;
+  try { const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' }); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: false }); }
+  catch (err) { toast("Couldn't read that file – save it as .xlsx or .csv", true); return; }
+  rows = rows.filter((r) => r.some((c) => String(c).trim()));
+  if (rows.length < 2) { toast('The sheet needs a heading row and at least one customer', true); return; }
+  const head = rows[0].map((h) => String(h).trim()), body = rows.slice(1);
+  const used = new Set(), map = {};
+  for (const [key, , re] of WB_FIELDS) { const i = head.findIndex((h, j) => !used.has(j) && re.test(h)); if (i >= 0) { map[key] = i; used.add(i); } }
+  const opts = (sel) => `<option value="">– not in this sheet –</option>` + head.map((h, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${esc(h || 'Column ' + (i + 1))}</option>`).join('');
+  modal(`<h2>Upload customer list</h2><p class="sub">${esc(f.name)} · ${body.length} row(s). Check which column is which:</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 14px">
+      ${WB_FIELDS.map(([k, label, , req]) => `<div><label class="f">${label}${req ? ' *' : ''}</label><select class="in" data-map="${k}">${opts(map[k])}</select></div>`).join('')}</div>
+    <div id="wbPrev" style="margin-top:12px"></div><div class="err" id="wbErr"></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" data-close>Cancel</button><span class="sp"></span><button class="btn primary" id="wbGo">Import</button></div>`, true);
+  const build = () => {
+    const m = {}; document.querySelectorAll('[data-map]').forEach((s) => { if (s.value !== '') m[s.dataset.map] = +s.value; });
+    const cell = (r, k) => (m[k] != null ? String(r[m[k]] ?? '').trim() : '');
+    const out = [], bad = [], seen = new Set();
+    body.forEach((r, i) => {
+      const wb = wbNorm(cell(r, 'waybill'));
+      const addr = [cell(r, 'address'), cell(r, 'suburb'), cell(r, 'city'), cell(r, 'province'), cell(r, 'postal')].filter(Boolean).join(', ');
+      if (!wb || !addr) { bad.push(i + 2); return; }
+      if (seen.has(wb)) return; seen.add(wb);
+      const lat = parseFloat(cell(r, 'lat')), lng = parseFloat(cell(r, 'lng'));
+      out.push({ company_id: ME.company_id, waybill: wb, name: cell(r, 'name') || null, phone: cell(r, 'phone') || null, address: addr,
+        lat: Number.isFinite(lat) ? lat : null, lng: Number.isFinite(lng) ? lng : null, notes: cell(r, 'notes') || null, updated_at: new Date().toISOString() });
+    });
+    return { m, out, bad };
+  };
+  const preview = () => {
+    const { m, out, bad } = build();
+    $('#wbPrev').innerHTML = (m.waybill == null || m.address == null) ? '<div class="err">Choose the waybill column and the address column.</div>'
+      : `<p><b>${out.length}</b> customer(s) ready${bad.length ? ` · <span style="color:var(--bad)">${bad.length} row(s) skipped (no waybill or address): rows ${bad.slice(0, 12).join(', ')}${bad.length > 12 ? '…' : ''}</span>` : ''}</p>
+        <div class="tbl"><table><thead><tr><th>Waybill</th><th>Customer</th><th>Phone</th><th>Address</th></tr></thead><tbody>
+        ${out.slice(0, 5).map((w) => `<tr><td><b>${esc(w.waybill)}</b></td><td>${esc(w.name || '')}</td><td>${esc(w.phone || '')}</td><td>${esc(w.address)}</td></tr>`).join('')}</tbody></table></div>`;
+  };
+  document.querySelectorAll('[data-map]').forEach((s) => (s.onchange = preview)); preview();
+  $('#wbGo').onclick = async () => {
+    const { out } = build(); if (!out.length) { $('#wbErr').textContent = 'Nothing to import.'; return; }
+    $('#wbGo').disabled = true;
+    for (let i = 0; i < out.length; i += 500) {
+      $('#wbGo').textContent = `Importing ${Math.min(i + 500, out.length)} / ${out.length}…`;
+      const r = await sb.from('waybills').upsert(out.slice(i, i + 500), { onConflict: 'company_id,waybill' });
+      if (r.error) { $('#wbErr').textContent = r.error.message; $('#wbGo').disabled = false; $('#wbGo').textContent = 'Import'; return; }
+    }
+    logEvent(`Uploaded customer list (${out.length} waybills)`, { file: f.name });
+    closeModal(); toast(`${out.length} customer(s) imported`); loadWaybills();
+  };
 };
 
 /* ---------- activity ---------- */
